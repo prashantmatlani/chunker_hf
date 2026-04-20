@@ -68,8 +68,26 @@ WHOLE = False # Set to True to process the whole book; False to process a page r
 START_PAGE = 5
 END_PAGE = 15
 
-def call_groq_json(system_prompt, user_content):
+async def call_groq_json(system_prompt, user_content):
     strict_system_prompt = system_prompt + "\nIMPORTANT: Ensure all internal quotes are escaped. Respond ONLY in valid JSON."
+
+    # Use loop.run_in_executor to keep the Groq call from blocking the UI
+    loop = asyncio.get_event_loop()
+    completion = await loop.run_in_executor(
+        None, 
+        lambda: client.chat.completions.create(
+            model=MODEL,
+            messages=[
+                {"role": "system", "content": strict_system_prompt},
+                {"role": "user", "content": user_content}
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.2
+        )
+    )
+    return json.loads(completion.choices[0].message.content)
+
+    """
     completion = client.chat.completions.create(
         model=MODEL,
         messages=[
@@ -80,7 +98,8 @@ def call_groq_json(system_prompt, user_content):
         temperature=0.2
     )
     return json.loads(completion.choices[0].message.content)
-
+    """
+    
 #async def run_chunking_process(pdf_path, queue=None, whole=False, start_p=20, end_p=30):
 async def run_chunking_process(pdf_path, queue=None, whole=WHOLE, start_p=START_PAGE, end_p=END_PAGE):
     """
