@@ -10,6 +10,7 @@ from groq import Groq
 from dotenv import load_dotenv
 from pathlib import Path
 
+import time 
 import datetime
 import sys
 
@@ -121,7 +122,15 @@ async def run_chunking_process(pdf_path, queue=None, whole=WHOLE, start_p=START_
                 
                 temp_group = []
 
+            # 5-second pause after every chunk to stay under TPM limits
+            print("  ⏳ Throttling for 5s to avoid Rate Limits...")
+            time.sleep(5)
+
         except Exception as e:
+            if "429" in str(e):
+                print("  ⚠️ Rate limited! Cooling down for 30 seconds...")
+                time.sleep(30)
+
             print(f"Error: {e}")
             cursor += 3000
             continue
