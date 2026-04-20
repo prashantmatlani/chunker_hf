@@ -22,11 +22,11 @@ encoding = tiktoken.get_encoding("cl100k_base")
 # 2. Define the folder and the filename
 #pdf_folder = Path("C:\\Users\\wd052\\OneDrive\\Desktop\\00\\01\\PDFs\\J\\CW") 
 #pdf_path = r"C:\Users\wd052\OneDrive\Desktop\00\01\PDFs\J\CW\Collected Works of Dr. C.G. Jung - Vol. 6 - Psychological-Types.pdf"
-pdf_folder = Path("C:/Users/wd052/OneDrive/Desktop/00/01/PDFs/J/CW") 
-pdf_name = "Collected Works of Dr. C.G. Jung - Vol. 6 - Psychological-Types.pdf"
+#pdf_folder = Path("C:/Users/wd052/OneDrive/Desktop/00/01/PDFs/J/CW") 
+#pdf_name = "Collected Works of Dr. C.G. Jung - Vol. 6 - Psychological-Types.pdf"
 
 # Combine them
-pdf_path = pdf_folder / pdf_name
+#pdf_path = pdf_folder / pdf_name
 
 WHOLE = False # Set to True to process the whole book; False to process a page range
 START_PAGE = 20
