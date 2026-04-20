@@ -123,7 +123,8 @@ async def run_chunking_process(pdf_path, queue=None, whole=WHOLE, start_p=START_
         prompt = f"Context: {context_buffer['latest_summary']} | Prev: {context_buffer['predecessor'][:200]}...\nExtract a self-sufficient Jungian chunk. JSON keys: 'break_text', 'rewritten_text', 'filename'."
         
         try:
-            result = call_groq_json(prompt, lookahead)
+            # Note: Ensure call_groq_json is an async function or run in executor
+            result = await call_groq_json(prompt, lookahead)
             
             # Semantic Jump Logic
             break_text = result.get('break_text', "")
@@ -143,6 +144,8 @@ async def run_chunking_process(pdf_path, queue=None, whole=WHOLE, start_p=START_
                 await queue.put(new_chunk)
 
             context_buffer["predecessor"] = new_chunk["content"]
+            # Throttling to stay under 6000 TPM limit
+            await asyncio.sleep(7) 
             cursor += relative_break
 
             # PHASE II: AGGREGATION
@@ -179,6 +182,8 @@ async def run_chunking_process(pdf_path, queue=None, whole=WHOLE, start_p=START_
             await asyncio.sleep(10) # Longer pause on error
 
             continue
+
+    if queue: await queue.put("DONE")
 
     # Final Save
     timestamp = datetime.datetime.now().strftime("%m%d%Y_%H%M")

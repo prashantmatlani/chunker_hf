@@ -5,7 +5,7 @@
 import os
 import asyncio
 import json
-from fastapi import FastAPI, UploadFile, File, BackgroundTasks
+from fastapi import FastAPI, UploadFile, File, Form, BackgroundTasks
 from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi import Form # Add Form to your imports
@@ -56,12 +56,10 @@ async def stream_updates():
     return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 
-from fastapi import Form
-
 @app.post("/upload")
 async def handle_upload(
     file: UploadFile = File(...),
-    whole: str = Form("false"), # Form data often comes as strings
+    whole: str = Form("false"),
     start: str = Form("20"),
     end: str = Form("30")
 ):
@@ -69,13 +67,12 @@ async def handle_upload(
     with open(temp_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
     
-    # Convert strings to proper Python types
+    # Fix: Convert strings to proper types
     is_whole = whole.lower() == "true"
     s_page = int(start)
     e_page = int(end)
 
-    print(f"DEBUG: whole={is_whole}, start={s_page}, end={e_page}")
-
+    # Start the task with explicit parameters
     asyncio.create_task(run_chunking_process(
         temp_path, 
         progress_queue, 
@@ -83,7 +80,7 @@ async def handle_upload(
         start_p=s_page, 
         end_p=e_page
     ))
-    return {"status": "Processing"}
+    return {"status": "Processing started"}
 
 
 
