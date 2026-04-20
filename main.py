@@ -8,6 +8,7 @@ import json
 from fastapi import FastAPI, UploadFile, File, BackgroundTasks
 from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
+from fastapi import Form # Add Form to your imports
 import shutil
 
 # Import chunking logic from the existing combined script
@@ -53,6 +54,29 @@ async def stream_updates():
             yield f"data: {json.dumps(data)}\n\n"
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+
+@app.post("/upload")
+async def handle_upload(
+    file: UploadFile = File(...),
+    whole: bool = Form(False),
+    start: int = Form(20),
+    end: int = Form(30)
+):
+    temp_path = f"temp_{file.filename}"
+    with open(temp_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+    
+    # Pass the UI values into your aggregator script
+    asyncio.create_task(run_chunking_process(
+        temp_path, 
+        progress_queue, 
+        whole=whole, 
+        start_p=start, 
+        end_p=end
+    ))
+    return {"status": "Started"}
+
 
 if __name__ == "__main__":
     import uvicorn
