@@ -56,26 +56,35 @@ async def stream_updates():
     return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 
+from fastapi import Form
+
 @app.post("/upload")
 async def handle_upload(
     file: UploadFile = File(...),
-    whole: bool = Form(False),
-    start: int = Form(20),
-    end: int = Form(30)
+    whole: str = Form("false"), # Form data often comes as strings
+    start: str = Form("20"),
+    end: str = Form("30")
 ):
     temp_path = f"temp_{file.filename}"
     with open(temp_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
     
-    # Pass the UI values into your aggregator script
+    # Convert strings to proper Python types
+    is_whole = whole.lower() == "true"
+    s_page = int(start)
+    e_page = int(end)
+
+    print(f"DEBUG: whole={is_whole}, start={s_page}, end={e_page}")
+
     asyncio.create_task(run_chunking_process(
         temp_path, 
         progress_queue, 
-        whole=whole, 
-        start_p=start, 
-        end_p=end
+        whole=is_whole, 
+        start_p=s_page, 
+        end_p=e_page
     ))
-    return {"status": "Started"}
+    return {"status": "Processing"}
+
 
 
 if __name__ == "__main__":

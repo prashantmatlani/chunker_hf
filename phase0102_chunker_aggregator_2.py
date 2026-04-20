@@ -1,4 +1,39 @@
 
+# ./phase0102_chunker_aggregator_2.py
+
+"""
+
+https://www.linkedin.com/pulse/new-way-encode-documents-ai-agents-navigable-trees-sergii-makarevych-a6cof/
+
+https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f
+
+
+The combined script - with two phases, I and II, fired sequentially - aligns with a/ the "Dense Theory" of knowledge extraction and b/ with Makarevych's "Incremental Aggregation" logic of the availabity of a set of chunks triggering the system's to generate a summary. The "Dense Theory" of knowledge extraction is the idea that the LLM should not only extract chunks but also immediately synthesize them into higher-level summaries, creating a "Knowledge Tree" with multiple levels of abstraction. 
+
+. The temp_group: Acts as a "waiting room." Once it hits 5 chunks, it empties itself into the Phase II Aggregator.
+. Memory Continuity: When the summary_node is created, it's saved to context_buffer["latest_summary"]. This means chunk #6 will actually "know" the summary of chunks #1–5, helping it stay consistent with the themes already established.
+. The "Children" Key: In the final JSON, each summary block now lists which leaf chunks belong to it. This is what makes it a Navigable Tree.
+
+
+> Phase I - Extract and rewrite chunks (The "Leaves")
+
+The Semantic Split: Instead of splitting at exactly 1000 characters, we give the LLM a 6000-character window and ask it to find the natural "Topic End" (break_text).
+
+Self-Sufficiency: The prompt tells the LLM to resolve pronouns; in a text where "it" could refer to a concept mentioned three paragraphs ago, this is vital.
+
+The Cursor: cursor += relative_break_point ensures we never lose our place in a document spanned across thousands of words, hundreds of pages.
+
+
+> Phase II - Incremental Aggregation into Summaries (The "Branches")
+
+Summary Block: With about five chunks, system builds a Summary Block
+
+Continuity: This Summary Block is then fed back into the context_buffer so the next set of Phase I chunks knows what the previous summary was. 
+
+"Knowledge Tree" is thus created of summaries as branches connecting chunks as leaves
+
+"""
+
 import os
 import json
 import datetime
@@ -66,6 +101,13 @@ async def run_chunking_process(pdf_path, queue=None, whole=WHOLE, start_p=START_
     # 2. Extract Markdown
     md_text = pymupdf4llm.to_markdown(str(pdf_path), pages=pages_to_read)
     
+    # --- Initialize the number of characters permitted to be skipped, depending on the total number of words in the document ---
+    total_len = len(md_text)
+    
+    # DYNAMIC JUMP: 10% of text or 2000 chars
+    dynamic_jump = min(2000, max(500, int(total_len * 0.1)))
+    # --- Initialize the number of characters permitted to be skipped, depending on the total number of words in the document - End ---
+    
     cursor = 0
     all_leaves = []
     summary_blocks = []
@@ -132,7 +174,10 @@ async def run_chunking_process(pdf_path, queue=None, whole=WHOLE, start_p=START_
                 time.sleep(30)
 
             print(f"Error: {e}")
-            cursor += 3000
+            #cursor += 3000
+            cursor += dynamic_jump # Use our automated jump
+            await asyncio.sleep(10) # Longer pause on error
+
             continue
 
     # Final Save
