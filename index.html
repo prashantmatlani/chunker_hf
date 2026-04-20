@@ -1,0 +1,89 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jung Chunker UI</title>
+    <style>
+        :root { --bg: #fdf6e3; --text: #586e75; --accent: #268bd2; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--bg); color: var(--text); margin: 0; display: flex; height: 100vh; }
+        
+        /* Sidebar for the Tree */
+        #sidebar { width: 350px; border-right: 1px solid #ddd; overflow-y: auto; padding: 20px; background: #eee8d5; }
+        #viewer { flex-grow: 1; padding: 40px; overflow-y: auto; line-height: 1.6; }
+        
+        .tree-node { margin-left: 15px; border-left: 2px solid #ccc; padding-left: 10px; margin-bottom: 10px; }
+        .summary-block { font-weight: bold; color: var(--accent); cursor: pointer; display: block; margin-top: 15px; }
+        .leaf-node { font-size: 0.9em; cursor: pointer; color: #657b83; display: block; margin: 5px 0; }
+        .leaf-node:hover { text-decoration: underline; }
+        
+        h1 { font-size: 1.2em; border-bottom: 1px solid #ccc; padding-bottom: 10px; }
+        .chunk-content { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .upload-section { margin-bottom: 20px; padding: 15px; background: #fff; border-radius: 5px; }
+    </style>
+</head>
+<body>
+
+<div id="sidebar">
+    <h1>Jungian Chunker</h1>
+    
+    <div class="upload-section">
+        <input type="file" id="pdfUpload" accept=".pdf">
+        <button onclick="uploadFile()">Upload PDF</button>
+        <div id="status" style="font-size: 0.8em; margin-top: 5px;">Ready.</div>
+    </div>
+
+    <div id="tree-container">
+        <!-- Tree nodes will appear here dynamically -->
+        <p style="font-style: italic;">Tree will build here...</p>
+    </div>
+</div>
+
+<div id="viewer">
+    <div id="content-display" class="chunk-content">
+        <h2>Content Viewer</h2>
+        <p>Select a chunk from the tree to read the self-sufficient version here.</p>
+    </div>
+</div>
+
+<script>
+    // Placeholder function to simulate file upload
+    async function uploadFile() {
+        const fileInput = document.getElementById('pdfUpload');
+        const status = document.getElementById('status');
+        if (!fileInput.files[0]) return alert("Select a file first!");
+
+        status.innerText = "Uploading & Processing...";
+        
+        // In your real HF Space, you'll use: 
+        // const formData = new FormData();
+        // formData.append('file', fileInput.files[0]);
+        // await fetch('/upload', {method: 'POST', body: formData});
+        
+        status.innerText = "Simulating Tree Build...";
+        mockTreeBuild();
+    }
+
+    // This simulates the UI updating as your Python script works
+    function mockTreeBuild() {
+        const container = document.getElementById('tree-container');
+        container.innerHTML = ""; // Clear
+
+        // Example of a Summary Node
+        const summary = document.createElement('div');
+        summary.className = "tree-node";
+        summary.innerHTML = `<span class="summary-block">⭐ Psychological Development</span>
+                             <span class="leaf-node" onclick="view('Introversion vs Extraversion', 'This is the self-sufficient text about mechanisms...')">∟ extraverted_vs_introverted</span>
+                             <span class="leaf-node" onclick="view('The Personal Equation', 'Psychological constellation affects the observer...')">∟ personal_equation</span>`;
+        container.appendChild(summary);
+    }
+
+    function view(title, text) {
+        const display = document.getElementById('content-display');
+        display.innerHTML = `<h2>${title}</h2><p>${text}</p>`;
+    }
+</script>
+
+</body>
+</html>
