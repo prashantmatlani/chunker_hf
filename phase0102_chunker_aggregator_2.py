@@ -43,7 +43,6 @@ def call_groq_json(system_prompt, user_content):
         response_format={"type": "json_object"},
         temperature=0.2
     )
-    print(f"\nLLM raw response: {completion.choices[0].message.content}\n")
     return json.loads(completion.choices[0].message.content)
 
 #async def run_chunking_process(pdf_path, queue=None, whole=False, start_p=20, end_p=30):
@@ -63,7 +62,6 @@ async def run_chunking_process(pdf_path, queue=None, whole=WHOLE, start_p=START_
         pages_to_read = list(range(start_p, end_p))
         print(f"📑 Processing pages {start_p} to {end_p}...")
 
-    print(f"\ngot to CW6 chunking logic with pdf_path: {pdf_path} and pages_to_read: {pages_to_read}")
     # 2. Extract Markdown
     md_text = pymupdf4llm.to_markdown(str(pdf_path), pages=pages_to_read)
     
@@ -107,7 +105,6 @@ async def run_chunking_process(pdf_path, queue=None, whole=WHOLE, start_p=START_
             # PHASE II: AGGREGATION
             if len(temp_group) >= CHUNK_GROUP_SIZE:
                 from phase0102_chunker_aggregator_2 import generate_summary_block # Ensure helper is available
-                print(f"\nreached phase0102")
                 summary_res = generate_summary_block(temp_group)
                 
                 summary_node = {
