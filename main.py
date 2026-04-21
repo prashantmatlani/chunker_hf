@@ -6,10 +6,12 @@ import os
 import asyncio
 import json
 from fastapi import FastAPI, UploadFile, File, Form, BackgroundTasks
-from fastapi.responses import HTMLResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, StreamingResponse, FileResponse # Added FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi import Form # Add Form to your imports
 import shutil
+import glob
+
 
 # Import chunking logic from the existing combined script
 # Note: Ensure script functions are wrap-able or callable
@@ -82,6 +84,15 @@ async def handle_upload(
     ))
     return {"status": "Processing started"}
 
+@app.get("/download-latest")
+async def download_latest():
+    # Look for files matching our pattern
+    files = glob.glob("knowledge_tree_*.json")
+    if not files: 
+        return {"error": "No JSON files found yet. Finish an extraction first."}
+    # Sort by creation time to get the newest one
+    latest_file = max(files, key=os.path.getctime)
+    return FileResponse(path=latest_file, filename=os.path.basename(latest_file))
 
 
 if __name__ == "__main__":

@@ -40,7 +40,14 @@
     </div>
     
     <button onclick="uploadFile()" style="margin-top:10px; width:100%;">Process Jungian Tree</button>
+    
     <div id="status" style="font-size: 0.8em; margin-top: 10px; color: var(--accent);">Status: Idle</div>
+
+    <!-- Download Button -->
+        <button id="downloadBtn" style="display:none; margin-top:10px; background:#2aa198; color:white; border:none; padding:10px; cursor:pointer; width:100%;">
+            📥 Download Knowledge Tree
+        </button>
+    </div>
 
     <div id="tree-container"></div> 
 
@@ -56,13 +63,19 @@ async function uploadFile() {
     const isWhole = document.querySelector('input[name="mode"]:checked').value === 'whole';
     const status = document.getElementById('status');
     
+    // Explicitly grab the values from the inputs
+    const startVal = document.getElementById('startP').value;
+    const endVal = document.getElementById('endP').value;
+
     if (fileInput.files.length === 0) return alert("Please select a PDF");
 
     const formData = new FormData();
     formData.append('file', fileInput.files[0]);
     formData.append('whole', isWhole);
-    formData.append('start', document.getElementById('startP').value || 20);
-    formData.append('end', document.getElementById('endP').value || 30);
+    formData.append('start', startVal || 20); // Fallback to 20 if empty
+    formData.append('end', endVal || 30);     // Fallback to 30 if empty
+
+    console.log("Sending Range:", startVal, "to", endVal); // Check browser console
 
     status.innerText = "Status: Uploading...";
     await fetch('/upload', { method: 'POST', body: formData });
@@ -71,10 +84,18 @@ async function uploadFile() {
     listenToStream();
 }
 
+// --- VIEW function ---
+function view(title, text) {
+    const display = document.getElementById('content-display');
+    display.innerHTML = `<h2>${title}</h2><div style="white-space: pre-wrap;">${text}</div>`;
+}
+
+// --- listenToStream Function --
 function listenToStream() {
     const eventSource = new EventSource('/stream');
     const container = document.getElementById('tree-container');
     const status = document.getElementById('status');
+    const dlBtn = document.getElementById('downloadBtn');
     container.innerHTML = ""; 
 
     eventSource.onmessage = (event) => {
@@ -82,6 +103,8 @@ function listenToStream() {
         
         if (data.type === 'done') {
             status.innerText = "✅ EXTRACTION FINISHED!";
+            dlBtn.style.display = "block"; // Show the button
+            dlBtn.onclick = () => window.location.href = '/download-latest';
             eventSource.close();
             return;
         }
@@ -90,11 +113,13 @@ function listenToStream() {
         const node = document.createElement('div');
         node.className = data.type === 'summary' ? "tree-node summary-block" : "tree-node leaf-node";
         node.innerHTML = (data.type === 'summary' ? "⭐ " : "∟ ") + (data.name || data.filename);
+        // Pass the content to the view function when clicked
         node.onclick = () => view(data.name || data.filename, data.content);
         container.appendChild(node);
         status.innerText = `Status: Created ${data.type}...`;
     };
 }
+
 </script>
 
 

@@ -99,7 +99,7 @@ async def call_groq_json(system_prompt, user_content):
     )
     return json.loads(completion.choices[0].message.content)
     """
-    
+
 #async def run_chunking_process(pdf_path, queue=None, whole=False, start_p=20, end_p=30):
 async def run_chunking_process(pdf_path, queue=None, whole=WHOLE, start_p=START_PAGE, end_p=END_PAGE):
     """
@@ -170,7 +170,7 @@ async def run_chunking_process(pdf_path, queue=None, whole=WHOLE, start_p=START_
             # PHASE II: AGGREGATION
             if len(temp_group) >= CHUNK_GROUP_SIZE:
                 from phase0102_chunker_aggregator_2 import generate_summary_block # Ensure helper is available
-                summary_res = generate_summary_block(temp_group)
+                summary_res = await generate_summary_block(temp_group)
                 
                 summary_node = {
                     "type": "summary",
@@ -214,7 +214,7 @@ async def run_chunking_process(pdf_path, queue=None, whole=WHOLE, start_p=START_
         await queue.put("DONE")
 
 # Helper for summary
-def generate_summary_block(chunks):
+async def generate_summary_block(chunks):
     combined = "\n\n".join([f"{c['filename']}: {c['content']}" for c in chunks])
-    prompt = "Synthesize these Jungian chunks into a dense Level-1 summary. JSON keys: 'summary_name', 'synthesis'."
-    return call_groq_json(prompt, combined)
+    prompt = "Synthesize these Jungian chunks into a single high-density Level-1 summary. JSON keys: 'summary_name', 'synthesis'."
+    return await call_groq_json(prompt, combined)
