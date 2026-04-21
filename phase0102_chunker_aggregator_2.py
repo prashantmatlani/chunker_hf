@@ -65,8 +65,8 @@ encoding = tiktoken.get_encoding("cl100k_base")
 #pdf_path = pdf_folder / pdf_name
 
 WHOLE = False # Set to True to process the whole book; False to process a page range
-START_PAGE = 5
-END_PAGE = 15
+START_PAGE = 8
+END_PAGE = 10
 
 async def call_groq_json(system_prompt, user_content):
     strict_system_prompt = system_prompt + "\nIMPORTANT: Ensure all internal quotes are escaped. Respond ONLY in valid JSON."
