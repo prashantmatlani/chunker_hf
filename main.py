@@ -5,16 +5,16 @@
 import os
 import asyncio
 import json
+import uvicorn
 from fastapi import FastAPI, UploadFile, File, Form, BackgroundTasks
 from fastapi.responses import HTMLResponse, StreamingResponse, FileResponse # Added FileResponse
 from fastapi.staticfiles import StaticFiles
-from fastapi import Form # Add Form to your imports
 import shutil
 import glob
 
 # Import chunking logic from the existing combined script
 # Note: Ensure script functions are wrap-able or callable
-from phase0102_chunker_aggregator_2 import run_chunking_process 
+from chunker.chunker_hf.phase0102_chunker_aggregator_2_l0l1 import run_chunking_process 
 
 app = FastAPI()
 
@@ -73,6 +73,7 @@ async def handle_upload(
     # Fix: Convert strings to proper types
     is_whole = whole.lower() == "true"
     s_page = int(start)
+    s_page = s_page-1 if s_page != 1 else 1
     e_page = int(end)
 
     #Debugging the values received from the UI
@@ -100,5 +101,4 @@ async def download_latest():
 
 
 if __name__ == "__main__":
-    import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=7860)
