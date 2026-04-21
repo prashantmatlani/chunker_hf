@@ -101,7 +101,8 @@ async def call_groq_json(system_prompt, user_content):
     """
 
 #async def run_chunking_process(pdf_path, queue=None, whole=False, start_p=20, end_p=30):
-async def run_chunking_process(pdf_path, queue=None, whole=WHOLE, start_p=START_PAGE, end_p=END_PAGE):
+# + 1 to END PAGE; Python's range(5, 7) gives pages 5 and 6, to include page 7, we need range(5, 8)
+async def run_chunking_process(pdf_path, queue=None, whole=WHOLE, start_p=START_PAGE, end_p=END_PAGE+1):
     """
     Main entry point for the chunking logic.
     If queue is provided, it 'yields' results to the UI.
@@ -127,6 +128,9 @@ async def run_chunking_process(pdf_path, queue=None, whole=WHOLE, start_p=START_
     dynamic_jump = min(2000, max(500, int(total_len * 0.1)))
     # --- Initialize the number of characters permitted to be skipped, depending on the total number of words in the document - End ---
     
+    print(f"filepath -> {pdf_path}")
+    print(f"\n# of words -> {total_len}; dynamic jump at -> {dynamic_jump}")
+
     cursor = 0
     all_leaves = []
     summary_blocks = []
@@ -137,6 +141,18 @@ async def run_chunking_process(pdf_path, queue=None, whole=WHOLE, start_p=START_
 
     while cursor < len(md_text):
         lookahead = md_text[cursor : cursor + 6000]
+
+        # ---- DEBUG: Print first 50 characters to see the starting sentence ----
+        start_snippet = lookahead[:50].replace('\n', ' ')
+        print(f"🔍 DEBUG: Cursor at {cursor}. Current text starts with: '{start_snippet}'")
+        
+        # Since pymupdf4llm inserts page markers like '----- Page 5 -----', we search backwards from the cursor to find the last page tag/number
+        current_page_search = md_text[:cursor].rfind("Page ")
+        if current_page_search != -1:
+            page_num = md_text[current_page_search:current_page_search+10]
+            print(f"📖 DEBUG: Currently scanning near {page_num}")
+        # ---- DEBUG: Print first 50 characters to see the starting sentence - End ----
+
         if not lookahead.strip(): break
 
         prompt = f"Context: {context_buffer['latest_summary']} | Prev: {context_buffer['predecessor'][:200]}...\nExtract a self-sufficient Jungian chunk. JSON keys: 'break_text', 'rewritten_text', 'filename'."
