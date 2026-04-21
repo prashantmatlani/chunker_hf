@@ -280,10 +280,33 @@ async def run_chunking_process(pdf_path, queue=None, whole=WHOLE, start_p=START_
     
     if queue: await queue.put("DONE")
 
-
+"""
 # Helper for summary
 async def generate_summary_block(chunks):
     combined = "\n\n".join([f"{c['filename']}: {c['content']}" for c in chunks])
     prompt = "Synthesize these Jungian chunks into a single high-density Level-1 summary. JSON keys: 'summary_name', 'synthesis'."
     
     return await call_groq_json(prompt, combined)
+"""
+
+# Add 'label' as a second parameter with a default value
+async def generate_summary_block(chunks_to_summarize, label="Level-1 Cluster"):
+    combined_content = "\n\n".join([f"Source: {c['name']}\n{c['content']}" for c in chunks_to_summarize])
+    
+    # We use the 'label' in the prompt to help the LLM understand the scale
+    system_prompt = f"""
+    You are creating a '{label}' for a Knowledge Tree of Carl Jung's work.
+    
+    TASK:
+    Synthesize the provided content into a single, high-density summary.
+    - DO NOT say 'This section covers...'.
+    - DO say 'Psychological concepts in this section include...'
+    - Maintain the information density of the original inputs.
+    
+    RESPONSE FORMAT (JSON):
+    {{
+      "summary_name": "thematic_cluster_name",
+      "synthesis": "the dense summary text"
+    }}
+    """
+    return await call_groq_json(system_prompt, combined_content)
