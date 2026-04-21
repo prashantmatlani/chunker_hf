@@ -102,12 +102,14 @@ async def call_groq_json(system_prompt, user_content):
 
 #async def run_chunking_process(pdf_path, queue=None, whole=False, start_p=20, end_p=30):
 # - 1 to START PAGE; Python's range(5, 7) gives pages 6 and 7, to get to the exact specified range we do START_PAGE-1
+# Alignment: Convert Human (1-indexed) to Library (0-indexed)
+# Human page 5 is internal page 4
 async def run_chunking_process(pdf_path, queue=None, whole=WHOLE, start_p=START_PAGE-1, end_p=END_PAGE):
     """
     Main entry point for the chunking logic.
     If queue is provided, it 'yields' results to the UI.
     """
-    print(f"\nwhole: {whole}, start_p: {start_p}, end_p: {end_p}")
+    #print(f"\nwhole: {whole}, start_p: {start_p}, end_p: {end_p}")
 
     # 1. Determine Page Range
     if whole:
@@ -116,7 +118,7 @@ async def run_chunking_process(pdf_path, queue=None, whole=WHOLE, start_p=START_
         print("📚 Processing the WHOLE book...")
     else:
         pages_to_read = list(range(start_p, end_p))
-        print(f"📑 Processing pages {start_p-1} to {end_p}...") # for print purposes subtract and add back 1 from start and end pages, aligning with those specified in the code
+        print(f"📑 Processing pages {START_PAGE} to {END_PAGE}...") # for print purposes subtract and add back 1 from start and end pages, aligning with those specified in the code
 
     # 2. Extract Markdown
     md_text = pymupdf4llm.to_markdown(str(pdf_path), pages=pages_to_read)
@@ -143,7 +145,7 @@ async def run_chunking_process(pdf_path, queue=None, whole=WHOLE, start_p=START_
         lookahead = md_text[cursor : cursor + 6000]
 
         # ---- DEBUG: Print first 50 characters to see the starting sentence ----
-        start_snippet = lookahead[:50].replace('\n', ' ')
+        start_snippet = lookahead[:80].replace('\n', ' ')
         print(f"🔍 DEBUG: Cursor at {cursor}. Current text starts with: '{start_snippet}'")
         
         # Since pymupdf4llm inserts page markers like '----- Page 5 -----', we search backwards from the cursor to find the last page tag/number
@@ -155,15 +157,13 @@ async def run_chunking_process(pdf_path, queue=None, whole=WHOLE, start_p=START_
 
         if not lookahead.strip(): break
 
-        prompt = f"Context: {context_buffer['latest_summary']} | Prev: {context_buffer['predecessor'][:200]}...\nExtract a self-sufficient Jungian chunk. JSON keys: 'break_text', 'rewritten_text', 'filename'."
+        #prompt = f"Context: {context_buffer['latest_summary']} | Prev: {context_buffer['predecessor'][:200]}...\nExtract a self-sufficient Jungian chunk. JSON keys: 'break_text', 'rewritten_text', 'filename'."
         
         try:
+            prompt = "Extract self-sufficient Jungian chunk. JSON keys: 'break_text', 'rewritten_text', 'filename'."
+
             # Note: Ensure call_groq_json is an async function or run in executor
             result = await call_groq_json(prompt, lookahead)
-            
-            # Semantic Jump Logic
-            break_text = result.get('break_text', "")
-            relative_break = lookahead.find(break_text) + len(break_text) if break_text in lookahead else 2000
             
             new_chunk = {
                 "type": "leaf",
@@ -171,20 +171,28 @@ async def run_chunking_process(pdf_path, queue=None, whole=WHOLE, start_p=START_
                 "content": result.get('rewritten_text', '')
             }
             
-            all_leaves.append(new_chunk)
-            temp_group.append(new_chunk)
+            context_buffer["predecessor"] = new_chunk["content"]
 
+            all_leaves.append(new_chunk)
+            
             # PUSH TO UI
             if queue:
                 await queue.put(new_chunk)
 
-            context_buffer["predecessor"] = new_chunk["content"]
-            # Throttling to stay under 6000 TPM limit
-            await asyncio.sleep(7) 
+            # Semantic Jump Logic; find the break text and move cursor
+            break_text = result.get('break_text', "")
+            relative_break = lookahead.find(break_text) + len(break_text) if break_text in lookahead else 2000
+
             cursor += relative_break
 
-            # PHASE II: AGGREGATION
+            temp_group.append(new_chunk)
+            # Throttling to stay under 6000 TPM limit
+            await asyncio.sleep(7) 
+            
+
+            # PHASE II: AGGREGATION - TRIGGER L1 SUMMARY
             if len(temp_group) >= CHUNK_GROUP_SIZE:
+                print("⭐ TRIGGER L1 AGGREGATION - PREPARE SUMMARY")
                 from phase0102_chunker_aggregator_2 import generate_summary_block # Ensure helper is available
                 summary_res = await generate_summary_block(temp_group)
                 
@@ -211,7 +219,7 @@ async def run_chunking_process(pdf_path, queue=None, whole=WHOLE, start_p=START_
                 print("  ⚠️ Rate limited! Cooling down for 30 seconds...")
                 time.sleep(30)
 
-            print(f"Error: {e}")
+            print(f"❌ ERROR AT CURSOR {cursor}: {e}")
             #cursor += 3000
             cursor += dynamic_jump # Use our automated jump
             await asyncio.sleep(10) # Longer pause on error

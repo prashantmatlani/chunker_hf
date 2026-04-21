@@ -6,12 +6,12 @@ import os
 import asyncio
 import json
 from fastapi import FastAPI, UploadFile, File, Form, BackgroundTasks
-from fastapi.responses import HTMLResponse, StreamingResponse, FileResponse # Added FileResponse
+from fastapi.responses import HTMLResponse, StreamingResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi import Form # Add Form to your imports
 import shutil
 import glob
-
+from phase0102_chunker_aggregator_2 import run_chunking_process
 
 # Import chunking logic from the existing combined script
 # Note: Ensure script functions are wrap-able or callable
@@ -27,6 +27,7 @@ async def get_ui():
     with open("index.html", "r") as f:
         return f.read()
 
+"""
 @app.post("/upload")
 async def handle_upload(file: UploadFile = File(...)):
     # Save the uploaded PDF to a local temp file
@@ -39,6 +40,7 @@ async def handle_upload(file: UploadFile = File(...)):
     asyncio.create_task(run_chunking_process(temp_path, progress_queue))
     
     return {"status": "Processing started", "filename": file.filename}
+"""
 
 @app.get("/stream")
 async def stream_updates():
@@ -74,7 +76,10 @@ async def handle_upload(
     s_page = int(start)
     e_page = int(end)
 
-    # Start the task with explicit parameters
+    # CRITICAL: Debugging the values received from the UI
+    print(f"📡 UI SIGNAL RECEIVED: whole={is_whole}, start={s_page}, end={e_page}")
+
+    # Start the task with explicit parameters; pass everything to the aggregator
     asyncio.create_task(run_chunking_process(
         temp_path, 
         progress_queue, 
