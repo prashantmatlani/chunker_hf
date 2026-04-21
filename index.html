@@ -21,6 +21,13 @@
         h1 { font-size: 1.2em; border-bottom: 1px solid #ccc; padding-bottom: 10px; }
         .chunk-content { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
         .upload-section { margin-bottom: 20px; padding: 15px; background: #fff; border-radius: 5px; }
+
+         /* Styling for different levels */
+        .summary_l1 { color: #268bd2; font-weight: bold; margin-left: 10px; border-left: 2px solid #268bd2; }
+        .summary_l2 { color: #d33682; font-weight: 800; margin-left: 5px; border-left: 4px solid #d33682; font-size: 1.1em; }
+        .summary_l3 { color: #b58900; font-weight: 900; text-transform: uppercase; border: 2px solid #b58900; padding: 5px; text-align: center; }
+        .leaf-node { color: #657b83; margin-left: 20px; font-size: 0.9em; }
+
     </style>
 </head>
 <body>
@@ -111,10 +118,23 @@ function listenToStream() {
 
         // Add Leaf or Summary to the UI
         const node = document.createElement('div');
-        node.className = data.type === 'summary' ? "tree-node summary-block" : "tree-node leaf-node";
-        node.innerHTML = (data.type === 'summary' ? "⭐ " : "∟ ") + (data.name || data.filename);
+        //node.className = data.type === 'summary' ? "tree-node summary-block" : "tree-node leaf-node";
+        //node.innerHTML = (data.type === 'summary' ? "⭐ " : "∟ ") + (data.name || data.filename);
         // Pass the content to the view function when clicked
-        node.onclick = () => view(data.name || data.filename, data.content);
+        //node.onclick = () => view(data.name || data.filename, data.content);
+        node.className = `tree-node ${data.type}`; // Uses summary_l1, summary_l2, etc.
+        
+        let prefix = "∟ ";
+        if (data.type === 'summary_l1') prefix = "⭐ ";
+        if (data.type === 'summary_l2') prefix = "💎 ";
+        if (data.type === 'summary_l3') prefix = "👑 ";
+
+        //node.innerHTML = prefix + data.name;
+        // innerHTML with "OR" check
+        node.innerHTML = prefix + (data.name || data.filename || "Untitled Chunk");
+
+        node.onclick = () => view(data.name, data.content);
+
         container.appendChild(node);
         status.innerText = `Status: Created ${data.type}...`;
     };

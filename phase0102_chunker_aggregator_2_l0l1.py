@@ -8,12 +8,6 @@ https://www.linkedin.com/pulse/new-way-encode-documents-ai-agents-navigable-tree
 https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f
 
 
-The Logic of the Knowledge-Pyramid
-L0 (Leaves): 1-2 pages of raw text rewritten.
-L1 (Clusters/Branches): Summary of 5 Leaves (~10 pages).
-L2 (Chapters): Summary of 5 L1 Clusters/Branches (~50 pages).
-L3 (Volume): Summary of all L2 Nodes (The entire book).
-
 The combined script - with two phases, I and II, fired sequentially - aligns with a/ the "Dense Theory" of knowledge extraction and b/ with Makarevych's "Incremental Aggregation" logic of the availabity of a set of chunks triggering the system's to generate a summary. The "Dense Theory" of knowledge extraction is the idea that the LLM should not only extract chunks but also immediately synthesize them into higher-level summaries, creating a "Knowledge Tree" with multiple levels of abstraction. 
 
 . The temp_group: Acts as a "waiting room." Once it hits 5 chunks, it empties itself into the Phase II Aggregator.
@@ -100,6 +94,20 @@ async def call_groq_json(system_prompt, user_content):
     # Then we access the "message" key, followed by "content" key to get the raw JSON string
     return json.loads(completion.choices[0].message.content)
 
+    """
+    completion = client.chat.completions.create(
+        model=MODEL,
+        messages=[
+            {"role": "system", "content": strict_system_prompt},
+            {"role": "user", "content": user_content}
+        ],
+        response_format={"type": "json_object"},
+        temperature=0.2
+    )
+    return json.loads(completion.choices[0].message.content)
+    """
+
+#async def run_chunking_process(pdf_path, queue=None, whole=False, start_p=20, end_p=30):
 # - 1 to START PAGE; Python's range(5, 7) gives pages 6 and 7, to get to the exact specified range we do START_PAGE-1
 # Alignment: Convert Human (1-indexed) to Library (0-indexed)
 # Human page 5 is internal page 4
@@ -134,16 +142,10 @@ async def run_chunking_process(pdf_path, queue=None, whole=WHOLE, start_p=START_
     print(f"\n# of words -> {total_len}; dynamic jump at -> {dynamic_jump}")
 
     cursor = 0
-    l0_buffer = [] # Holds Leaves for L1 (Clusters/Branches)
-    l1_buffer = [] # Holds L1 Summaries for L2 (Chapters)
-    l2_buffer = [] # Holds L2 Summaries for L3 (Volumes)
-
-    l0_buffer_size = 5 # CHUNK_GROUP_SIZE
-
-    #all_leaves = []
-    #summary_blocks = []
-    #temp_group = []
-    #CHUNK_GROUP_SIZE = 5
+    all_leaves = []
+    summary_blocks = []
+    temp_group = []
+    CHUNK_GROUP_SIZE = 5
     
     context_buffer = {"predecessor": "Start", "latest_summary": "None"}
 
@@ -164,73 +166,76 @@ async def run_chunking_process(pdf_path, queue=None, whole=WHOLE, start_p=START_
 
         if not lookahead.strip(): break
 
-        #prompt = f"Context: {context_buffer['latest_summary']} | Prev: {context_buffer['predecessor'][:200]}...\nExtract a self-sufficient Jungian chunk. JSON keys: 'break_text', 'rewritten_text', 'filename'."
+        prompt = f"Context: {context_buffer['latest_summary']} | Prev: {context_buffer['predecessor'][:200]}...\nExtract a self-sufficient Jungian chunk. JSON keys: 'break_text', 'rewritten_text', 'filename'."
         
         try:
-            # --- PHASE I: CREATE L0 LEAF ---
-            prompt = "Extract self-sufficient Jungian chunk. JSON: 'break_text', 'rewritten_text', 'filename'."
-
             # Note: Ensure call_groq_json is an async function or run in executor
-            res = await call_groq_json(prompt, lookahead)
+            result = await call_groq_json(prompt, lookahead)
             
-            leaf = {"type": "leaf", "name": res['filename'], "content": res['rewritten_text']}
-            l0_buffer.append(leaf) # stack-up leaves
-
-            #  PUSH TO UI
-            if queue: await queue.put(leaf)
-
-            # --- PHASE II: AGGREGATE LEAVES; TRIGGER L1 (Every 5 Leaves) ---
-            if len(l0_buffer) >= l0_buffer_size:
-                print("⭐ Creating L1 Cluster...")
-                l1_res = await generate_summary_block(l0_buffer, "Level-1 Cluster")
-                l1_node = {"type": "summary_l1", "name": l1_res['summary_name'], "content": l1_res['synthesis']}
-                
-                l1_buffer.append(l1_node) # stack-up clusters/branches
-                if queue: await queue.put(l1_node)
-                l0_buffer = [] # Reset L0
-
-            # --- PHASE III: TRIGGER L2 (Every 5 L1 Clusters) ---
-            if len(l1_buffer) >= 5:
-                print("💎 Creating L2 Chapter...")
-                l2_res = await generate_summary_block(l1_buffer, "Level-2 Chapter")
-                l2_node = {"type": "summary_l2", "name": l2_res['summary_name'], "content": l2_res['synthesis']}
-                
-                l2_buffer.append(l2_node) # stack-up chapters
-                if queue: await queue.put(l2_node)
-                l1_buffer = [] # Reset L1
-
             # Process the break and update cursor; also "result.get(...)" prevents crashes if keys are missing
             # Semantic Jump Logic, find the break text and move cursor
-            break_text = res.get('break_text', "")
-            cursor += (lookahead.find(break_text) + len(break_text)) if break_text in lookahead else 2000
+            break_text = result.get('break_text', "")
+            relative_break = lookahead.find(break_text) + len(break_text) if break_text in lookahead else 2000
+            
+            new_chunk = {
+                "type": "leaf",
+                "filename": result.get('filename', 'untitled_chunk'),
+                "content": result.get('rewritten_text', '')
+            }
+            
+            all_leaves.append(new_chunk)
+            temp_group.append(new_chunk)
 
+            # PUSH TO UI
+            if queue:
+                await queue.put(new_chunk)
+
+            context_buffer["predecessor"] = new_chunk["content"]
             # Throttling to stay under 6000 TPM limit
-            await asyncio.sleep(7)
+            await asyncio.sleep(7) 
+            cursor += relative_break
+
+            # PHASE II: AGGREGATION - TRIGGER L1 SUMMARY
+            if len(temp_group) >= CHUNK_GROUP_SIZE:
+                print("⭐ TRIGGER L1 AGGREGATION - PREPARE SUMMARY")
+                #from chunker.chunker_hf.phase0102_chunker_aggregator_2_l0l1 import generate_summary_block # Ensure helper is available
+                summary_res = await generate_summary_block(temp_group)
+                
+                summary_node = {
+                    "type": "summary",
+                    "name": summary_res['summary_name'],
+                    "content": summary_res['synthesis'],
+                    "children": [c['filename'] for c in temp_group]
+                }
+                summary_blocks.append(summary_node)
+                context_buffer["latest_summary"] = summary_node["content"]
+                
+                if queue:
+                    await queue.put(summary_node)
+                
+                temp_group = []
+
+            # 5-second pause after every chunk to stay under TPM limits
+            print("  ⏳ Throttling for 5s to avoid Rate Limits...")
+            time.sleep(5)
 
         except Exception as e:
             if "429" in str(e):
                 print("  ⚠️ Rate limited! Cooling down for 30 seconds...")
                 time.sleep(30)
-            print(f"❌ ERROR AT CURSOR {cursor}: {e}") 
-            #print(f"Error: {e}")
-            #cursor += 2000
+
+            print(f"❌ ERROR AT CURSOR {cursor}: {e}")
+            #cursor += 3000
             cursor += dynamic_jump # Use our automated jump
             await asyncio.sleep(10) # Longer pause on error
-            continue
 
-    # --- FINAL WRAP UP: L3 VOLUME SUMMARY ---
-    if l2_buffer:
-        print("👑 Creating L3 Volume Summary...")
-        l3_res = await generate_summary_block(l2_buffer, "Level-3 Volume")
-        l3_node = {"type": "summary_l3", "name": l3_res['summary_name'], "content": l3_res['synthesis']}
-        if queue: await queue.put(l3_node)
+            continue
 
     if queue: await queue.put("DONE")
 
-
     # Final Save
     timestamp = datetime.datetime.now().strftime("%m%d%Y_%H%M")
-    final_data = {"leaves": leaf, "cluster/branch summary": l1_node, "chapter": l2_node, "volume": l3_node}
+    final_data = {"leaves": all_leaves, "summaries": summary_blocks}
     with open(f"knowledge_tree_{timestamp}.json", "w") as f:
         json.dump(final_data, f, indent=4)
     
@@ -241,5 +246,4 @@ async def run_chunking_process(pdf_path, queue=None, whole=WHOLE, start_p=START_
 async def generate_summary_block(chunks):
     combined = "\n\n".join([f"{c['filename']}: {c['content']}" for c in chunks])
     prompt = "Synthesize these Jungian chunks into a single high-density Level-1 summary. JSON keys: 'summary_name', 'synthesis'."
-    
     return await call_groq_json(prompt, combined)
