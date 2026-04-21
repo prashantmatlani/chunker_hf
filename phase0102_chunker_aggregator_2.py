@@ -68,6 +68,8 @@ WHOLE = False # Set to True to process the whole book; False to process a page r
 START_PAGE = 8
 END_PAGE = 10
 
+laf = 100 # look-ahead factor
+
 async def call_groq_json(system_prompt, user_content):
     strict_system_prompt = system_prompt + "\nIMPORTANT: Ensure all internal quotes are escaped. Respond ONLY in valid JSON."
 
@@ -142,7 +144,8 @@ async def run_chunking_process(pdf_path, queue=None, whole=WHOLE, start_p=START_
     context_buffer = {"predecessor": "Start", "latest_summary": "None"}
 
     while cursor < len(md_text):
-        lookahead = md_text[cursor : cursor + 6000]
+        #lookahead = md_text[cursor : cursor + 6000]
+        lookahead = md_text[cursor : cursor + laf]
 
         # ---- DEBUG: Print first 50 characters to see the starting sentence ----
         start_snippet = lookahead[:80].replace('\n', ' ')
