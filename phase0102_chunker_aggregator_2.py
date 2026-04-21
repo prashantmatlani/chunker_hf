@@ -8,11 +8,12 @@ https://www.linkedin.com/pulse/new-way-encode-documents-ai-agents-navigable-tree
 https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f
 
 
-The Logic of the Knowledge-Pyramid
-L0 (Leaves): 1-2 pages of raw text rewritten.
-L1 (Clusters/Branches): Summary of 5 Leaves (~10 pages).
-L2 (Chapters): Summary of 5 L1 Clusters/Branches (~50 pages).
-L3 (Volume): Summary of all L2 Nodes (The entire book).
+ ----- The Logic of the Knowledge-Pyramid: ----- 
+
+L0 (Leaves): 1-2 pages of raw text rewritten
+L1 (Clusters/Branches): Summary of 5 Leaves (~10 pages)
+L2 (Chapters): Summary of 5 L1 Clusters/Branches (~50 pages)
+L3 (Volume): Summary of all L2 Nodes (The entire book)
 
 The combined script - with two phases, I and II, fired sequentially - aligns with a/ the "Dense Theory" of knowledge extraction and b/ with Makarevych's "Incremental Aggregation" logic of the availabity of a set of chunks triggering the system's to generate a summary. The "Dense Theory" of knowledge extraction is the idea that the LLM should not only extract chunks but also immediately synthesize them into higher-level summaries, creating a "Knowledge Tree" with multiple levels of abstraction. 
 
@@ -135,10 +136,15 @@ async def run_chunking_process(pdf_path, queue=None, whole=WHOLE, start_p=START_
 
     cursor = 0
     l0_buffer = [] # Holds Leaves for L1 (Clusters/Branches)
-    l1_buffer = [] # Holds L1 Summaries for L2 (Chapters)
-    l2_buffer = [] # Holds L2 Summaries for L3 (Volumes)
+    #l1_buffer = [] # Holds L1 Summaries for L2 (Chapters)
+    #l2_buffer = [] # Holds L2 Summaries for L3 (Volumes)
 
-    l0_buffer_size = 5 # CHUNK_GROUP_SIZE
+    all_leaves = []     # Final collection
+    all_l1_summaries = []
+    all_l2_summaries = []
+    l3_node = None      # The final crown
+
+    l_buffer_size = 5 # CHUNK_GROUP_SIZE
 
     #all_leaves = []
     #summary_blocks = []
@@ -174,28 +180,38 @@ async def run_chunking_process(pdf_path, queue=None, whole=WHOLE, start_p=START_
             res = await call_groq_json(prompt, lookahead)
             
             leaf = {"type": "leaf", "name": res['filename'], "content": res['rewritten_text']}
+
+            all_leaves.append(leaf)
             l0_buffer.append(leaf) # stack-up leaves
 
             #  PUSH TO UI
             if queue: await queue.put(leaf)
 
             # --- PHASE II: AGGREGATE LEAVES; TRIGGER L1 (Every 5 Leaves) ---
-            if len(l0_buffer) >= l0_buffer_size:
+            if len(l0_buffer) >= l_buffer_size:
                 print("⭐ Creating L1 Cluster...")
                 l1_res = await generate_summary_block(l0_buffer, "Level-1 Cluster")
                 l1_node = {"type": "summary_l1", "name": l1_res['summary_name'], "content": l1_res['synthesis']}
                 
-                l1_buffer.append(l1_node) # stack-up clusters/branches
+                all_l1_summaries.append(l1_node)
+                #l1_buffer.append(l1_node) # stack-up clusters/branches
+                
                 if queue: await queue.put(l1_node)
+                
                 l0_buffer = [] # Reset L0
 
             # --- PHASE III: TRIGGER L2 (Every 5 L1 Clusters) ---
-            if len(l1_buffer) >= 5:
+            #if len(l1_buffer) >= l_buffer_size:
+            if len(all_l1_summaries) >= l_buffer_size and len(all_l1_summaries) % 5 == 0:
                 print("💎 Creating L2 Chapter...")
-                l2_res = await generate_summary_block(l1_buffer, "Level-2 Chapter")
+                # We take the last 5 L1s
+
+                l2_res = await generate_summary_block(all_l1_summaries[-5:], "Level-2 Chapter")
+
                 l2_node = {"type": "summary_l2", "name": l2_res['summary_name'], "content": l2_res['synthesis']}
                 
-                l2_buffer.append(l2_node) # stack-up chapters
+                all_l2_summaries.append(l2_node)
+                #l2_buffer.append(l2_node) # stack-up chapters
                 if queue: await queue.put(l2_node)
                 l1_buffer = [] # Reset L1
 
@@ -218,24 +234,52 @@ async def run_chunking_process(pdf_path, queue=None, whole=WHOLE, start_p=START_
             await asyncio.sleep(10) # Longer pause on error
             continue
 
-    # --- FINAL WRAP UP: L3 VOLUME SUMMARY ---
-    if l2_buffer:
-        print("👑 Creating L3 Volume Summary...")
-        l3_res = await generate_summary_block(l2_buffer, "Level-3 Volume")
+    # --- FINAL FLUSH (The "Cleanup" Phase) ---
+    # If the book ends and we have leftover leaves (1-4), summarize them now!
+    if l0_buffer:
+        l1_res = await generate_summary_block(l0_buffer, "Final Level-1 Cluster")
+        l1_node = {"type": "summary_l1", "name": l1_res['summary_name'], "content": l1_res['synthesis']}
+        all_l1_summaries.append(l1_node)
+        if queue: await queue.put(l1_node)
+
+    # Summarize all L1s into L2 if we haven't already
+    if all_l1_summaries and not all_l2_summaries:
+        l2_res = await generate_summary_block(all_l1_summaries, "Level-2 Chapter")
+        l2_node = {"type": "summary_l2", "name": l2_res['summary_name'], "content": l2_res['synthesis']}
+        all_l2_summaries.append(l2_node)
+        if queue: await queue.put(l2_node)
+
+    # FINAL VOLUME SUMMARY (L3)
+    if all_l2_summaries:
+        l3_res = await generate_summary_block(all_l2_summaries, "Level-3 Volume")
         l3_node = {"type": "summary_l3", "name": l3_res['summary_name'], "content": l3_res['synthesis']}
         if queue: await queue.put(l3_node)
 
-    if queue: await queue.put("DONE")
+    #if queue: await queue.put("DONE")
 
 
-    # Final Save
+    # --- THE SAFE SAVE ---
     timestamp = datetime.datetime.now().strftime("%m%d%Y_%H%M")
-    final_data = {"leaves": leaf, "cluster/branch summary": l1_node, "chapter": l2_node, "volume": l3_node}
-    with open(f"knowledge_tree_{timestamp}.json", "w") as f:
+    #final_data = {
+    #    "metadata": {"pages": f"{start_p}-{end_p}", "date": timestamp},
+    #    "leaves": all_leaves,
+    #    "l1_clusters": all_l1_summaries,
+    #    "l2_chapters": all_l2_summaries,
+    #    "l3_volume": l3_node
+    #}
+    
+    final_data = {"date": timestamp,
+                "leaves": all_leaves,
+                "l1_clusters": all_l1_summaries,
+                "l2_chapters": all_l2_summaries,
+                "l3_volume": l3_node}
+
+    output_file = f"knowledge_tree_{timestamp}.json"
+    with open(output_file, "w") as f:
         json.dump(final_data, f, indent=4)
     
-    if queue:
-        await queue.put("DONE")
+    if queue: await queue.put("DONE")
+
 
 # Helper for summary
 async def generate_summary_block(chunks):
