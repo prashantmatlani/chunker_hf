@@ -1,3 +1,19 @@
+<<<<<<< HEAD
+=======
+
+# Ignore everything
+*
+
+# But don't ignore the chunker_hf directory
+#!chunker_hf/
+#!chunker_hf/**
+!C:\Users\wd052\OneDrive\Desktop\00\Works\PB\py\chunker\chunker_hf\**
+!C:\Users\wd052\OneDrive\Desktop\00\Works\PB\py\chunker\chunker_hf\
+
+# Don't ignore the .gitignore file itself
+!.gitignore
+
+>>>>>>> ebaf5b0 (init)
 venv/
 node_modules/
 *.log
