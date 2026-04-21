@@ -1,5 +1,4 @@
-
-# ./phase0102_chunker_aggregator_2.py
+# ./phase0102_chunker_aggregator_2_mod.py
 
 """
 
@@ -160,31 +159,35 @@ async def run_chunking_process(pdf_path, queue=None, whole=WHOLE, start_p=START_
         prompt = f"Context: {context_buffer['latest_summary']} | Prev: {context_buffer['predecessor'][:200]}...\nExtract a self-sufficient Jungian chunk. JSON keys: 'break_text', 'rewritten_text', 'filename'."
         
         try:
+            #prompt = "Extract self-sufficient Jungian chunk. JSON keys: 'break_text', 'rewritten_text', 'filename'."
+
             # Note: Ensure call_groq_json is an async function or run in executor
             result = await call_groq_json(prompt, lookahead)
             
-            # Process the break and update cursor; also "result.get(...)" prevents crashes if keys are missing
-            # Semantic Jump Logic, find the break text and move cursor
-            break_text = result.get('break_text', "")
-            relative_break = lookahead.find(break_text) + len(break_text) if break_text in lookahead else 2000
-            
             new_chunk = {
                 "type": "leaf",
-                "filename": result.get('filename', 'untitled_chunk'),
+                "filename": result.get('filename', 'untitled'),
                 "content": result.get('rewritten_text', '')
             }
             
-            all_leaves.append(new_chunk)
-            temp_group.append(new_chunk)
+            context_buffer["predecessor"] = new_chunk["content"]
 
+            all_leaves.append(new_chunk)
+            
             # PUSH TO UI
             if queue:
                 await queue.put(new_chunk)
 
-            context_buffer["predecessor"] = new_chunk["content"]
+            # Semantic Jump Logic; find the break text and move cursor
+            break_text = result.get('break_text', "")
+            relative_break = lookahead.find(break_text) + len(break_text) if break_text in lookahead else 2000
+
+            cursor += relative_break
+
+            temp_group.append(new_chunk)
             # Throttling to stay under 6000 TPM limit
             await asyncio.sleep(7) 
-            cursor += relative_break
+            
 
             # PHASE II: AGGREGATION - TRIGGER L1 SUMMARY
             if len(temp_group) >= CHUNK_GROUP_SIZE:

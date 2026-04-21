@@ -6,7 +6,7 @@ import os
 import asyncio
 import json
 from fastapi import FastAPI, UploadFile, File, Form, BackgroundTasks
-from fastapi.responses import HTMLResponse, StreamingResponse, FileResponse
+from fastapi.responses import HTMLResponse, StreamingResponse, FileResponse # Added FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi import Form # Add Form to your imports
 import shutil
@@ -76,7 +76,7 @@ async def handle_upload(
     s_page = int(start)
     e_page = int(end)
 
-    # CRITICAL: Debugging the values received from the UI
+    #Debugging the values received from the UI
     print(f"📡 UI SIGNAL RECEIVED: whole={is_whole}, start={s_page}, end={e_page}")
 
     # Start the task with explicit parameters; pass everything to the aggregator
