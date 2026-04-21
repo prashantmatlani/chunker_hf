@@ -101,8 +101,8 @@ async def call_groq_json(system_prompt, user_content):
     """
 
 #async def run_chunking_process(pdf_path, queue=None, whole=False, start_p=20, end_p=30):
-# + 1 to END PAGE; Python's range(5, 7) gives pages 6 and 7, to get to the exact specified range we do START_PAGE-1 AND END_PAGE+1
-async def run_chunking_process(pdf_path, queue=None, whole=WHOLE, start_p=START_PAGE-1, end_p=END_PAGE+1):
+# - 1 to START PAGE; Python's range(5, 7) gives pages 6 and 7, to get to the exact specified range we do START_PAGE-1
+async def run_chunking_process(pdf_path, queue=None, whole=WHOLE, start_p=START_PAGE-1, end_p=END_PAGE):
     """
     Main entry point for the chunking logic.
     If queue is provided, it 'yields' results to the UI.
@@ -116,7 +116,7 @@ async def run_chunking_process(pdf_path, queue=None, whole=WHOLE, start_p=START_
         print("📚 Processing the WHOLE book...")
     else:
         pages_to_read = list(range(start_p, end_p))
-        print(f"📑 Processing pages {start_p} to {end_p}...")
+        print(f"📑 Processing pages {start_p-1} to {end_p}...") # for print purposes subtract and add back 1 from start and end pages, aligning with those specified in the code
 
     # 2. Extract Markdown
     md_text = pymupdf4llm.to_markdown(str(pdf_path), pages=pages_to_read)
