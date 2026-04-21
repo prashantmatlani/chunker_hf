@@ -101,8 +101,8 @@ async def call_groq_json(system_prompt, user_content):
     """
 
 #async def run_chunking_process(pdf_path, queue=None, whole=False, start_p=20, end_p=30):
-# + 1 to END PAGE; Python's range(5, 7) gives pages 5 and 6, to include page 7, we need range(5, 8)
-async def run_chunking_process(pdf_path, queue=None, whole=WHOLE, start_p=START_PAGE, end_p=END_PAGE+1):
+# + 1 to END PAGE; Python's range(5, 7) gives pages 6 and 7, to get to the exact specified range we do START_PAGE-1 AND END_PAGE+1
+async def run_chunking_process(pdf_path, queue=None, whole=WHOLE, start_p=START_PAGE-1, end_p=END_PAGE+1):
     """
     Main entry point for the chunking logic.
     If queue is provided, it 'yields' results to the UI.
