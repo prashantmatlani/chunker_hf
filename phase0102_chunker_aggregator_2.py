@@ -219,6 +219,15 @@ async def run_chunking_process(pdf_path, queue=None, whole=WHOLE, start_p=START_
             # Semantic Jump Logic, find the break text and move cursor
             break_text = res.get('break_text', "")
             cursor += (lookahead.find(break_text) + len(break_text)) if break_text in lookahead else 2000
+            
+            new_chunk = {
+            "type": "leaf",
+            "filename": res.get('filename', 'untitled'),
+            "content": res.get('rewritten_text', ''),
+            "original": lookahead[:len(res.get('break_text', '')) + 500] # Save a snippet of the original
+            }
+
+
 
             # Throttling to stay under 6000 TPM limit
             await asyncio.sleep(7)
@@ -277,7 +286,10 @@ async def run_chunking_process(pdf_path, queue=None, whole=WHOLE, start_p=START_
     output_file = f"knowledge_tree_{timestamp}.json"
     with open(output_file, "w") as f:
         json.dump(final_data, f, indent=4)
-    
+
+    # CALL TO CREATE NESTED AND TABULAR MARKDOWNs
+    export_visual_formats(final_data, timestamp) 
+
     if queue: await queue.put("DONE")
 
 """
@@ -310,3 +322,47 @@ async def generate_summary_block(chunks_to_summarize, label="Level-1 Cluster"):
     }}
     """
     return await call_groq_json(system_prompt, combined_content)
+
+"""
+Nested Markdown 
+
+Contextual Integrity - Acts as a "Read Me" for the Jungian Agent. It can follow the # headers to understand the hierarchy.
+Auditability: By including the SOURCE TEXT vs AI INTERPRETATION, it becomes possible to verify whether the LLM is "hallucinating" terms like individuation or if it's a valid AI interpretation in the Jungian sense, owing to the alchemical symbols.
+
+Table Markdown 
+
+Visual Clarity: Table Markdown is perfect for a quick bird's-eye view, such as the number of chunks under each chapter 
+"""
+# --- NESTED AND TABULAR MARKDOWN
+def export_visual_formats(final_data, timestamp):
+    # --- NESTED MARKDOWN ---
+    md_nested = f"# 👑 VOLUME: {final_data['metadata']['pages']}\n"
+    md_nested += f"> {final_data['l3_volume']['content'] if final_data['l3_volume'] else 'N/A'}\n\n"
+    
+    for l2 in final_data['l2_chapters']:
+        md_nested += f"## 💎 CHAPTER: {l2['name']}\n> {l2['content']}\n\n"
+        # Logic to associate children would go here; for now, we list all relevant nodes
+        for l1 in final_data['l1_clusters']:
+            md_nested += f"### ⭐ CLUSTER: {l1['name']}\n> {l1['content']}\n\n"
+            for leaf in final_data['leaves']:
+                md_nested += f"#### 📄 {leaf['name']}\n"
+                md_nested += f"**[AI INTERPRETATION]:** {leaf['content']}\n\n"
+                md_nested += f"**[ORIGINAL TEXT]:** {leaf.get('original', 'N/A')[:250]}...\n\n---\n"
+
+    # --- TABULAR MARKDOWN ---
+    md_table = "| Level | Name | Content Snippet |\n| :--- | :--- | :--- |\n"
+    if final_data['l3_volume']:
+        md_table += f"| 👑 VOLUME | {final_data['l3_volume']['name']} | {final_data['l3_volume']['content'][:150]}... |\n"
+    for l2 in final_data['l2_chapters']:
+        md_table += f"| 💎 CHAPTER | {l2['name']} | {l2['content'][:150]}... |\n"
+    for l1 in final_data['l1_clusters']:
+        md_table += f"| ⭐ CLUSTER | {l1['name']} | {l1['content'][:150]}... |\n"
+    for leaf in final_data['leaves']:
+        md_table += f"| 📄 LEAF | {leaf['name']} | **[AI]** {leaf['content'][:150]}... |\n"
+
+    # Save files
+    with open(f"nested_knowledge_{timestamp}.md", "w", encoding="utf-8") as f: f.write(md_nested)
+    with open(f"table_knowledge_{timestamp}.md", "w", encoding="utf-8") as f: f.write(md_table)
+
+    
+    print(f"✅ Visual Markdowns created: nested_knowledge_{timestamp}.md and table_knowledge_{timestamp}.md")
