@@ -345,7 +345,8 @@ Visual Clarity: Table Markdown is perfect for a quick bird's-eye view, such as t
 # --- NESTED AND TABULAR MARKDOWN
 def export_visual_formats(final_data, timestamp):
     # --- NESTED MARKDOWN ---
-    md_nested = f"# 👑 VOLUME: {final_data['metadata']['pages']}\n"
+    #md_nested = f"# 👑 VOLUME: {final_data['metadata']['pages']}\n"
+    md_nested = f"# 👑 VOLUME SUMMARY\n"
     md_nested += f"> {final_data['l3_volume']['content'] if final_data['l3_volume'] else 'N/A'}\n\n"
     
     for l2 in final_data['l2_chapters']:
@@ -354,7 +355,7 @@ def export_visual_formats(final_data, timestamp):
         for l1 in final_data['l1_clusters']:
             md_nested += f"### ⭐ CLUSTER: {l1['name']}\n> {l1['content']}\n\n"
             for leaf in final_data['leaves']:
-                md_nested += f"#### 📄 {leaf['name']}\n"
+                md_nested += f"#### 📄 [LEAF]: {leaf['name']}\n"
                 md_nested += f"**[AI INTERPRETATION]:** {leaf['content']}\n\n"
                 md_nested += f"**[ORIGINAL TEXT]:** {leaf.get('original', 'N/A')[:250]}...\n\n---\n"
 
