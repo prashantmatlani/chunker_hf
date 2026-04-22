@@ -227,8 +227,6 @@ async def run_chunking_process(pdf_path, queue=None, whole=WHOLE, start_p=START_
             "original": lookahead[:len(res.get('break_text', '')) + 500] # Save a snippet of the original
             }
 
-
-
             # Throttling to stay under 6000 TPM limit
             await asyncio.sleep(7)
 
@@ -336,7 +334,7 @@ Visual Clarity: Table Markdown is perfect for a quick bird's-eye view, such as t
 # --- NESTED AND TABULAR MARKDOWN
 def export_visual_formats(final_data, timestamp):
     # --- NESTED MARKDOWN ---
-    md_nested = f"# 👑 VOLUME: {final_data['metadata']['pages']}\n"
+    #md_nested = f"# 👑 VOLUME: {final_data['metadata']['pages']}\n"
     md_nested += f"> {final_data['l3_volume']['content'] if final_data['l3_volume'] else 'N/A'}\n\n"
     
     for l2 in final_data['l2_chapters']:
