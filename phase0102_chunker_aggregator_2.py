@@ -95,7 +95,7 @@ async def call_groq_json(system_prompt, user_content):
             temperature=0.2 # Lower temperature = more stable JSON; the LLM is less "creative" with formatting at temperature of 0.2, and more likely to follow a perfect JSON structure
         )
     )
-
+    
     # LLM can technically generate multiple different versions of an answer if its asked to
     # Groq returns these as a list called "choices", since even a single answer is inside a list,  Python must be told to look at index 0 to get the actual content 
     # Then we access the "message" key, followed by "content" key to get the raw JSON string
@@ -123,6 +123,15 @@ async def run_chunking_process(pdf_path, queue=None, whole=WHOLE, start_p=START_
     # 2. Extract Markdown
     md_text = pymupdf4llm.to_markdown(str(pdf_path), pages=pages_to_read)
     
+    # Returns a list of dictionaries, one for each page
+    #pagesscanned = pymupdf4llm.to_markdown("your_document.pdf", page_chunks=True)
+    pagesscanned = pymupdf4llm.to_markdown(str(pdf_path), page_chunks=True)
+
+    # Instead of a single string of text, we have a list to pull directly the page numbers being scanned from each chunk's metadata
+    for p in pagesscanned:
+        real_page_num = p["metadata"]["page_number"] # This is the real-time detected page
+        text_content = p["text"]
+
     # --- Initialize the number of characters permitted to be skipped, depending on the total number of words in the document ---
     total_len = len(md_text)
     
@@ -274,13 +283,15 @@ async def run_chunking_process(pdf_path, queue=None, whole=WHOLE, start_p=START_
     #    "l2_chapters": all_l2_summaries,
     #    "l3_volume": l3_node
     #}
-    
-    final_data = {"date": timestamp,
+    #"""
+    final_data = {
+                "metadata": {"pages": f"{pagesscanned}", "date": timestamp},
+                "date": timestamp,
                 "leaves": all_leaves,
                 "l1_clusters": all_l1_summaries,
                 "l2_chapters": all_l2_summaries,
                 "l3_volume": l3_node}
-
+    #"""
     output_file = f"knowledge_tree_{timestamp}.json"
     with open(output_file, "w") as f:
         json.dump(final_data, f, indent=4)
@@ -334,7 +345,7 @@ Visual Clarity: Table Markdown is perfect for a quick bird's-eye view, such as t
 # --- NESTED AND TABULAR MARKDOWN
 def export_visual_formats(final_data, timestamp):
     # --- NESTED MARKDOWN ---
-    #md_nested = f"# 👑 VOLUME: {final_data['metadata']['pages']}\n"
+    md_nested = f"# 👑 VOLUME: {final_data['metadata']['pagesscanned']}\n"
     md_nested += f"> {final_data['l3_volume']['content'] if final_data['l3_volume'] else 'N/A'}\n\n"
     
     for l2 in final_data['l2_chapters']:
