@@ -76,7 +76,7 @@ async def handle_upload(
     # Fix: Convert strings to proper types
     is_whole = whole.lower() == "true"
     s_page = int(start)
-    s_page = s_page-1 if s_page != 1 else 0
+    #s_page = s_page-1 if s_page != 1 else 0
     e_page = int(end)
 
     #Debugging the values received from the UI

@@ -71,9 +71,9 @@ encoding = tiktoken.get_encoding("cl100k_base")
 # Combine them
 #pdf_path = pdf_folder / pdf_name
 
-WHOLE = False # Set to True to process the whole book; False to process a page range
-START_PAGE = 8
-END_PAGE = 10
+#WHOLE = False # Set to True to process the whole book; False to process a page range
+#START_PAGE = 8
+#END_PAGE = 10
 
 laf = 2000 # look-ahead factor
 djf = 0.1 # dynamic jump factor
@@ -104,7 +104,8 @@ async def call_groq_json(system_prompt, user_content):
 # - 1 to START PAGE; Python's range(5, 7) gives pages 6 and 7, to get to the exact specified range we do START_PAGE-1
 # Alignment: Convert Human (1-indexed) to Library (0-indexed)
 # Human page 5 is internal page 4
-async def run_chunking_process(pdf_path, queue=None, whole=WHOLE, start_p=START_PAGE-1, end_p=END_PAGE):
+#async def run_chunking_process(pdf_path, queue=None, whole=WHOLE, start_p=START_PAGE-1, end_p=END_PAGE):
+async def run_chunking_process(pdf_path, queue=None, whole=False, start_p=1, end_p=1):
     """
     Main entry point for the chunking logic.
     If queue is provided, it 'yields' results to the UI.
@@ -117,21 +118,33 @@ async def run_chunking_process(pdf_path, queue=None, whole=WHOLE, start_p=START_
         pages_to_read = None 
         print("📚 Processing the WHOLE book...")
     else:
-        pages_to_read = list(range(start_p, end_p))
-        print(f"📑 Processing pages {START_PAGE} to {END_PAGE}...") # for print purposes subtract and add back 1 from start and end pages, aligning with those specified in the code
+        # start_p-1 -> adjustment for 0-indexing
+        pages_to_read = list(range(int(start_p-1), int(end_p)))
+        #print(f"📑 Processing pages {START_PAGE} to {END_PAGE}...") # for print purposes subtract and add back 1 from start and end pages, aligning with those specified in the code
 
     # 2. Extract Markdown
     md_text = pymupdf4llm.to_markdown(str(pdf_path), pages=pages_to_read)
     
     # Returns a list of dictionaries, one for each page
     #pagesscanned = pymupdf4llm.to_markdown("your_document.pdf", page_chunks=True)
-    pagesscanned = pymupdf4llm.to_markdown(str(pdf_path), page_chunks=True)
+    allpages = pymupdf4llm.to_markdown(str(pdf_path), page_chunks=True)
 
+    pages_data = pymupdf4llm.to_markdown(str(pdf_path), pages=pages_to_read, page_chunks=True)
+    
+    print(f"📖 Page-Aware Engine Started. Total Pages to process: {len(pages_data)}")
+
+    # pull page number from the chunk's metadata
+    for page in pages_data:
+        # Extract metadata from this specific page
+        current_page_text = page["text"]
+        real_page_num = page["metadata"].get("page_number", "??")
+
+    """
     # Instead of a single string of text, we have a list to pull directly the page numbers being scanned from each chunk's metadata
     for p in pagesscanned:
         real_page_num = p["metadata"]["page_number"] # This is the real-time detected page
         text_content = p["text"]
-
+    """
     # --- Initialize the number of characters permitted to be skipped, depending on the total number of words in the document ---
     total_len = len(md_text)
     
@@ -188,7 +201,7 @@ async def run_chunking_process(pdf_path, queue=None, whole=WHOLE, start_p=START_
             # Note: Ensure call_groq_json is an async function or run in executor
             res = await call_groq_json(prompt, lookahead)
             
-            leaf = {"type": "leaf", "name": res['filename'], "content": res['rewritten_text']}
+            leaf = {"type": "leaf", "page": real_page_num, "name": res['filename'], "content": res['rewritten_text']}
 
             all_leaves.append(leaf)
             l0_buffer.append(leaf) # stack-up leaves
@@ -227,13 +240,23 @@ async def run_chunking_process(pdf_path, queue=None, whole=WHOLE, start_p=START_
             # Process the break and update cursor; also "result.get(...)" prevents crashes if keys are missing
             # Semantic Jump Logic, find the break text and move cursor
             break_text = res.get('break_text', "")
-            cursor += (lookahead.find(break_text) + len(break_text)) if break_text in lookahead else 2000
+            cursor += (lookahead.find(break_text) + len(break_text)) if break_text in lookahead else laf # laf -> 2000
             
+            # Calculate exactly where the chunk ends
+            if break_text in lookahead:
+                end_index = lookahead.find(break_text) + len(break_text)
+            else:
+                end_index = laf # Fallback
+
+            # This captures ONLY the text analyzed for this specific leaf
+            actual_original_text = lookahead[:end_index]
+
             new_chunk = {
             "type": "leaf",
             "filename": res.get('filename', 'untitled'),
             "content": res.get('rewritten_text', ''),
-            "original": lookahead[:len(res.get('break_text', '')) + 500] # Save a snippet of the original
+            "page_num": page["metadata"]["page_number"], # capture page number
+            "original": actual_original_text, # Save a snippet of the original
             }
 
             # Throttling to stay under 6000 TPM limit
@@ -285,7 +308,9 @@ async def run_chunking_process(pdf_path, queue=None, whole=WHOLE, start_p=START_
     #}
     #"""
     final_data = {
-                "metadata": {"pages": f"{pagesscanned}", "date": timestamp},
+                #"metadata": {"pages": f"{allpages}", "date": timestamp},
+                #"metadata": {"page_number": f"{page_num}", "date": timestamp},
+                "metadata": {"pages": f"{start_p}-{end_p}", "date": timestamp},
                 "date": timestamp,
                 "leaves": all_leaves,
                 "l1_clusters": all_l1_summaries,
@@ -345,8 +370,11 @@ Visual Clarity: Table Markdown is perfect for a quick bird's-eye view, such as t
 # --- NESTED AND TABULAR MARKDOWN
 def export_visual_formats(final_data, timestamp):
     # --- NESTED MARKDOWN ---
-    #md_nested = f"# 👑 VOLUME: {final_data['metadata']['pages']}\n"
-    md_nested = f"# 👑 VOLUME SUMMARY\n"
+
+    # --- Uncoment the below to include the whole text - 'pages' - of the document in generated "nested_knowledge_xxxx" markdown and in json, useful in the case of short documents, articles, papers, etc. ---
+    #md_nested = f"# 👑 VOLUME: {final_data['metadata']['pages']}\n" 
+    md_nested = f"# 👑 VOLUME: {final_data['metadata']['page_num']}\n" 
+    #md_nested = f"# 👑 VOLUME SUMMARY\n"
     md_nested += f"> {final_data['l3_volume']['content'] if final_data['l3_volume'] else 'N/A'}\n\n"
     
     for l2 in final_data['l2_chapters']:
@@ -355,24 +383,38 @@ def export_visual_formats(final_data, timestamp):
         for l1 in final_data['l1_clusters']:
             md_nested += f"### ⭐ CLUSTER: {l1['name']}\n> {l1['content']}\n\n"
             for leaf in final_data['leaves']:
+                page_label = f" (Page {leaf.get('page_num', '??')})"
                 md_nested += f"#### 📄 [LEAF]: {leaf['name']}\n"
                 md_nested += f"**[AI INTERPRETATION]:** {leaf['content']}\n\n"
                 md_nested += f"**[ORIGINAL TEXT]:** {leaf.get('original', 'N/A')[:250]}...\n\n---\n"
 
     # --- TABULAR MARKDOWN ---
-    md_table = "| Level | Name | Content Snippet |\n| :--- | :--- | :--- |\n"
-    if final_data['l3_volume']:
-        md_table += f"| 👑 VOLUME | {final_data['l3_volume']['name']} | {final_data['l3_volume']['content'][:150]}... |\n"
+    md_table = "| Volume (L3) | Chapter (L2) | Cluster/Summary (L1) | Page | Chunk (L0) |\n"
+    md_table += "| :--- | :--- | :--- | :--- | :--- |\n"
+    
+    l3_name = final_data['l3_volume']['name'] if final_data['l3_volume'] else "Volume"
+    
     for l2 in final_data['l2_chapters']:
-        md_table += f"| 💎 CHAPTER | {l2['name']} | {l2['content'][:150]}... |\n"
-    for l1 in final_data['l1_clusters']:
-        md_table += f"| ⭐ CLUSTER | {l1['name']} | {l1['content'][:150]}... |\n"
-    for leaf in final_data['leaves']:
-        md_table += f"| 📄 LEAF | {leaf['name']} | **[AI]** {leaf['content'][:150]}... |\n"
+        l2_name = l2['name']
+        l2_summary = l2['content'][:100] + "..."
+        
+        for l1 in final_data['l1_clusters']:
+            l1_name = l1['name']
+            l1_summary = l1['content'][:100] + "..."
+            
+            for leaf in final_data['leaves']:
+                leaf_name = leaf['name']
+                # Include page number in the table for extra clarity
+                pg = leaf.get('page_num', '??')
+                leaf_content = f"**[P.{pg} AI]** " + leaf['content'][:150] + "..."
+                orig_text = leaf.get('original', 'N/A')[:100] + "..."
+
+                md_table += f"| 👑 VOLUME: {l3_name} | 💎 CHAPTER: **{l2_name}**: {l2_summary} | **⭐ CLUSTER: {l1_name}**: {l1_summary} | {pg} | 📄 LEAF: {leaf_content} | ORIGINAL: {orig_text} | \n"
+
 
     # Save files
     with open(f"nested_knowledge_{timestamp}.md", "w", encoding="utf-8") as f: f.write(md_nested)
     with open(f"table_knowledge_{timestamp}.md", "w", encoding="utf-8") as f: f.write(md_table)
 
     
-    print(f"✅ Visual Markdowns created: nested_knowledge_{timestamp}.md and table_knowledge_{timestamp}.md")
+    print(f"✅ Created: \n\nVisual Markdowns: \nnested_knowledge_{timestamp}.md  \ntable_knowledge_{timestamp}.md \n\nand JSON: \n\nknowledge_tree_{timestamp}.json")
