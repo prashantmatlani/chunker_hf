@@ -373,8 +373,8 @@ def export_visual_formats(final_data, timestamp):
 
     # --- Uncoment the below to include the whole text - 'pages' - of the document in generated "nested_knowledge_xxxx" markdown and in json, useful in the case of short documents, articles, papers, etc. ---
     #md_nested = f"# 👑 VOLUME: {final_data['metadata']['pages']}\n" 
-    md_nested = f"# 👑 VOLUME: {final_data['metadata']['page_num']}\n" 
-    #md_nested = f"# 👑 VOLUME SUMMARY\n"
+    #md_nested = f"# 👑 VOLUME: {final_data['metadata']['page_num']}\n" 
+    md_nested = f"# 👑 VOLUME SUMMARY\n"
     md_nested += f"> {final_data['l3_volume']['content'] if final_data['l3_volume'] else 'N/A'}\n\n"
     
     for l2 in final_data['l2_chapters']:
