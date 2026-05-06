@@ -1,5 +1,5 @@
 
-# ./phase0102_chunker_aggregator_2.py
+# ./chunker_2.py
 
 """
 
@@ -47,7 +47,8 @@ import datetime
 import asyncio
 import tiktoken
 import pymupdf4llm
-from groq import Groq
+#from groq import Groq
+from huggingface_hub import InferenceClient
 
 from dotenv import load_dotenv
 from pathlib import Path
@@ -58,8 +59,11 @@ import sys
 
 
 load_dotenv()
-client = Groq(api_key=os.getenv("GROQ_API_KEY"))
-MODEL = "llama-3.1-8b-instant"
+#client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+#MODEL = "llama-3.1-8b-instant"
+client = InferenceClient(api_key=os.getenv("HF_TOKEN"))
+MODEL = "meta-llama/Llama-3.1-8B-Instruct"
+
 encoding = tiktoken.get_encoding("cl100k_base")
 
 # 2. Define the folder and the filename
