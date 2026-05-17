@@ -10,7 +10,7 @@ short_description: Chunker simple from Sergii Makarevych's SDDW-based Chunker
 
 # Chunker
 
-[Chunker] (https://huggingface.co/spaces/prashantmatlani/chunker), a supposed substitute for RAG, is a low-level "browse a file and extract" tool of knowledge extraction via Progressive Disclosure from a large and loaded source such as a book (articles, papers work too) - taking a cue from Sergii Makarevych's [work] (https://www.linkedin.com/pulse/new-way-encode-documents-ai-agents-navigable-trees-sergii-makarevych-a6cof/), in turn derived from Andrej Karpathy's [LLM Wiki pattern] (https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f)
+[Chunker](https://huggingface.co/spaces/prashantmatlani/chunker), a supposed substitute for RAG, is a low-level "browse a file and extract" tool of knowledge extraction via Progressive Disclosure from a large and loaded source such as a book (articles, papers work too) - taking a cue from Sergii Makarevych's [work](https://www.linkedin.com/pulse/new-way-encode-documents-ai-agents-navigable-trees-sergii-makarevych-a6cof/), in turn derived from Andrej Karpathy's [LLM Wiki pattern](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f)
 
 Chunker fulfills the base requirement of getting something along the lines of chunks and summaries as elaborated paragraphs from knowledge-source such as books. - though scaled up a little to include expanded Summary at Level 3 - worth hundreds of pages; called, although, "Jungian Chunker" it's usable for any pdf (though yet to be checked the max number of pages it can cover upto, but it probably runs into a few hundreds, and on the downside, its time-consuming)
 
